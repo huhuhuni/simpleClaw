@@ -276,6 +276,41 @@
         .upload-label { font-size: 13px; color: #777; pointer-events: none; }
         .upload-hint { font-size: 12px; min-height: 18px; margin-top: 6px; }
 
+        .memory-section { margin-top: 20px; }
+        .memory-core-preview {
+            font-size: 12px;
+            color: #777;
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 10px 12px;
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .memory-dates {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .memory-date-tag {
+            font-size: 11px;
+            padding: 3px 8px;
+            background: #1a2a1a;
+            border: 1px solid #2d4a2d;
+            border-radius: 4px;
+            color: #4ade80;
+        }
+        .sidebar-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -289,6 +324,7 @@
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
+      <div class="sidebar-scroll">
         <h2>设置</h2>
         <div class="form-group">
             <label>API Key</label>
@@ -305,6 +341,14 @@
         <button class="btn-save" id="btnSave" onclick="saveConfig()">保存设置</button>
         <div class="save-hint" id="saveHint"></div>
 
+        <h2 style="margin-top:28px;">记忆</h2>
+        <div class="memory-section">
+            <label style="font-size:12px;color:#888;">核心记忆</label>
+            <div class="memory-core-preview" id="memoryCore">加载中...</div>
+            <label style="font-size:12px;color:#888;margin-top:10px;display:block;">流水记忆</label>
+            <div class="memory-dates" id="memoryDates"></div>
+        </div>
+
         <h2 style="margin-top:28px;">已加载技能</h2>
         <div id="skillList" class="skill-list">加载中...</div>
         <div class="upload-area" id="uploadArea"
@@ -315,6 +359,7 @@
             <div class="upload-label">拖放 .zip 或点击上传技能</div>
         </div>
         <div class="upload-hint" id="uploadHint"></div>
+      </div>
     </aside>
 
     <div class="main">
@@ -434,7 +479,14 @@
                 }
 
                 for (const ev of data.events) {
-                    if (ev.type === 'skill') {
+                    if (ev.type === 'memory_recall') {
+                        addMessage('system-event', '🧠 ' + ev.content);
+                    } else if (ev.type === 'memory_empty') {
+                        addMessage('system-event', '🧠 ' + ev.content);
+                    } else if (ev.type === 'memory_saved') {
+                        addMessage('system-event', '💾 ' + ev.content);
+                        loadMemory();
+                    } else if (ev.type === 'skill') {
                         addMessage('system-event', '🧩 激活技能: ' + ev.skill);
                     } else if (ev.type === 'skill_loaded') {
                         addMessage('system-event', ev.content);
@@ -526,8 +578,26 @@
             } catch (e) {}
         }
 
+        async function loadMemory() {
+            try {
+                const res = await fetch('/api/memory');
+                const data = await res.json();
+                const coreEl = document.getElementById('memoryCore');
+                coreEl.textContent = data.core || '（空）';
+                const datesEl = document.getElementById('memoryDates');
+                if (data.dates.length === 0) {
+                    datesEl.innerHTML = '<span style="font-size:12px;color:#555">暂无记录</span>';
+                } else {
+                    datesEl.innerHTML = data.dates.map(d =>
+                        `<span class="memory-date-tag">${d}</span>`
+                    ).join('');
+                }
+            } catch (e) {}
+        }
+
         loadConfig();
         loadSkills();
+        loadMemory();
     </script>
 </body>
 </html>
