@@ -1,0 +1,13 @@
+[project]
+name = "simpleclaw"
+version = "0.1.0"
+description = "一个基于火山方舟 SDK 的 Agent 对话工具"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.1",
+    "python-dotenv>=1.0",
+    "volcengine-python-sdk[ark]>=5.0",
+]
+
+[project.scripts]
+simpleclaw = "app:main"

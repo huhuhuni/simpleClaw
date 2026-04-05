@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleClaw Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+        }
+
+        /* 侧边设置栏 */
+        .sidebar {
+            width: 320px;
+            background: #1a1a1a;
+            border-right: 1px solid #2a2a2a;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: transform 0.3s;
+        }
+        .sidebar.hidden { transform: translateX(-100%); position: absolute; }
+        .sidebar h2 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus { border-color: #646cff; }
+        .btn-save {
+            margin-top: 8px;
+            padding: 10px;
+            background: #646cff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-save:hover { background: #535bf2; }
+        .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .save-hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #4ade80;
+            min-height: 18px;
+        }
+
+        /* 主聊天区 */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .topbar {
+            height: 56px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .topbar button {
+            background: none;
+            border: 1px solid #333;
+            color: #aaa;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .topbar button:hover { border-color: #646cff; color: #fff; }
+        .topbar .title { font-size: 16px; font-weight: 600; }
+
+        /* 消息区 */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .messages::-webkit-scrollbar { width: 6px; }
+        .messages::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        .msg {
+            max-width: 720px;
+            width: fit-content;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .msg.user {
+            align-self: flex-end;
+            background: #646cff;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.assistant {
+            align-self: flex-start;
+            background: #1e1e1e;
+            border: 1px solid #2a2a2a;
+            border-bottom-left-radius: 4px;
+        }
+        .msg.system-event {
+            align-self: center;
+            background: #1a2a1a;
+            border: 1px solid #2d4a2d;
+            color: #4ade80;
+            font-size: 13px;
+            font-family: "SF Mono", Menlo, monospace;
+        }
+        .msg.error-event {
+            align-self: center;
+            background: #2a1a1a;
+            border: 1px solid #4a2d2d;
+            color: #f87171;
+            font-size: 13px;
+        }
+
+        .welcome {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 15px;
+        }
+
+        /* 输入区 */
+        .input-area {
+            padding: 16px 24px 24px;
+            background: #0f0f0f;
+            flex-shrink: 0;
+        }
+        .input-wrap {
+            max-width: 768px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-wrap textarea {
+            flex: 1;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            min-height: 48px;
+            max-height: 160px;
+            line-height: 1.5;
+            transition: border-color 0.2s;
+        }
+        .input-wrap textarea:focus { border-color: #646cff; }
+        .input-wrap textarea::placeholder { color: #555; }
+        .btn-send {
+            padding: 12px 20px;
+            background: #646cff;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .btn-send:hover { background: #535bf2; }
+        .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.2s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%   { content: ''; }
+            25%  { content: '.'; }
+            50%  { content: '..'; }
+            75%  { content: '...'; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 10;
+                height: 100%;
+                transform: translateX(-100%);
+            }
+            .sidebar.show { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <h2>设置</h2>
+        <div class="form-group">
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="输入你的 API Key">
+        </div>
+        <div class="form-group">
+            <label>Base URL</label>
+            <input type="text" id="baseUrl" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+        </div>
+        <div class="form-group">
+            <label>Model</label>
+            <input type="text" id="model" placeholder="模型名称 / 推理接入点 ID">
+        </div>
+        <button class="btn-save" id="btnSave" onclick="saveConfig()">保存设置</button>
+        <div class="save-hint" id="saveHint"></div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <button onclick="toggleSidebar()">⚙ 设置</button>
+            <span class="title">SimpleClaw Agent</span>
+            <button onclick="clearChat()">清空对话</button>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="welcome" id="welcome">输入消息开始对话</div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrap">
+                <textarea id="userInput" placeholder="输入你的任务..." rows="1"
+                    onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+                <button class="btn-send" id="btnSend" onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = [];
+        let sending = false;
+
+        async function loadConfig() {
+            const res = await fetch('/api/config');
+            const cfg = await res.json();
+            document.getElementById('apiKey').value = cfg.api_key || '';
+            document.getElementById('baseUrl').value = cfg.base_url || '';
+            document.getElementById('model').value = cfg.model || '';
+        }
+
+        async function saveConfig() {
+            const btn = document.getElementById('btnSave');
+            btn.disabled = true;
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    api_key: document.getElementById('apiKey').value.trim(),
+                    base_url: document.getElementById('baseUrl').value.trim(),
+                    model: document.getElementById('model').value.trim(),
+                })
+            });
+            btn.disabled = false;
+            if (res.ok) {
+                const hint = document.getElementById('saveHint');
+                hint.textContent = '✓ 已保存';
+                setTimeout(() => hint.textContent = '', 2000);
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('show');
+        }
+
+        function clearChat() {
+            chatHistory = [];
+            const box = document.getElementById('messages');
+            box.innerHTML = '<div class="welcome" id="welcome">输入消息开始对话</div>';
+        }
+
+        function addMessage(type, text) {
+            const welcome = document.getElementById('welcome');
+            if (welcome) welcome.remove();
+
+            const box = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'msg ' + type;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+            return div;
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            if (sending) return;
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            input.style.height = 'auto';
+            sending = true;
+            document.getElementById('btnSend').disabled = true;
+
+            addMessage('user', text);
+            const loading = addMessage('assistant', '思考中');
+            loading.classList.add('loading-dots');
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: text, history: chatHistory})
+                });
+                const data = await res.json();
+                loading.remove();
+
+                if (data.error) {
+                    addMessage('error-event', data.error);
+                    return;
+                }
+
+                for (const ev of data.events) {
+                    if (ev.type === 'command') {
+                        addMessage('assistant', ev.content);
+                        addMessage('system-event', '⚡ 执行: ' + ev.command);
+                    } else if (ev.type === 'exec_result') {
+                        addMessage('system-event', ev.content);
+                    } else if (ev.type === 'done') {
+                        addMessage('assistant', ev.content);
+                    } else {
+                        addMessage('assistant', ev.content);
+                    }
+                }
+
+                chatHistory = data.history;
+            } catch (e) {
+                loading.remove();
+                addMessage('error-event', '请求失败: ' + e.message);
+            } finally {
+                sending = false;
+                document.getElementById('btnSend').disabled = false;
+                input.focus();
+            }
+        }
+
+        loadConfig();
+    </script>
+</body>
+</html>
