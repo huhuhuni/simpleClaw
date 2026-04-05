@@ -219,6 +219,63 @@
             75%  { content: '...'; }
         }
 
+        .skill-list { display: flex; flex-direction: column; gap: 8px; }
+        .skill-item {
+            padding: 10px 12px;
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .skill-info { flex: 1; min-width: 0; }
+        .skill-item .skill-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+        .skill-item .skill-desc {
+            font-size: 12px;
+            color: #777;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+        .skill-del {
+            background: none;
+            border: none;
+            color: #555;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .skill-del:hover { color: #f87171; background: #2a1a1a; }
+        .skill-empty { font-size: 13px; color: #555; }
+        .upload-area {
+            margin-top: 12px;
+            border: 2px dashed #333;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .upload-area:hover { border-color: #646cff; }
+        .upload-area.dragover { border-color: #646cff; background: #1a1a2e; }
+        .upload-area input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .upload-label { font-size: 13px; color: #777; pointer-events: none; }
+        .upload-hint { font-size: 12px; min-height: 18px; margin-top: 6px; }
+
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -247,6 +304,17 @@
         </div>
         <button class="btn-save" id="btnSave" onclick="saveConfig()">保存设置</button>
         <div class="save-hint" id="saveHint"></div>
+
+        <h2 style="margin-top:28px;">已加载技能</h2>
+        <div id="skillList" class="skill-list">加载中...</div>
+        <div class="upload-area" id="uploadArea"
+            ondragover="event.preventDefault(); this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault(); this.classList.remove('dragover'); uploadSkill(event.dataTransfer.files[0])">
+            <input type="file" accept=".zip" onchange="uploadSkill(this.files[0]); this.value=''">
+            <div class="upload-label">拖放 .zip 或点击上传技能</div>
+        </div>
+        <div class="upload-hint" id="uploadHint"></div>
     </aside>
 
     <div class="main">
@@ -366,7 +434,13 @@
                 }
 
                 for (const ev of data.events) {
-                    if (ev.type === 'command') {
+                    if (ev.type === 'skill') {
+                        addMessage('system-event', '🧩 激活技能: ' + ev.skill);
+                    } else if (ev.type === 'skill_loaded') {
+                        addMessage('system-event', ev.content);
+                    } else if (ev.type === 'skill_not_found') {
+                        addMessage('error-event', ev.content);
+                    } else if (ev.type === 'command') {
                         addMessage('assistant', ev.content);
                         addMessage('system-event', '⚡ 执行: ' + ev.command);
                     } else if (ev.type === 'exec_result') {
@@ -389,7 +463,71 @@
             }
         }
 
+        async function loadSkills() {
+            const el = document.getElementById('skillList');
+            try {
+                const res = await fetch('/api/skills');
+                const skills = await res.json();
+                if (skills.length === 0) {
+                    el.innerHTML = '<div class="skill-empty">暂无技能，上传 .zip 安装</div>';
+                    return;
+                }
+                el.innerHTML = skills.map(s =>
+                    `<div class="skill-item">
+                        <div class="skill-info">
+                            <div class="skill-name">${s.name}${s.version ? ' <span style="color:#555;font-weight:400">v' + s.version + '</span>' : ''}</div>
+                            <div class="skill-desc">${s.description}</div>
+                        </div>
+                        <button class="skill-del" title="删除" onclick="deleteSkill('${s.dir}', '${s.name}')">✕</button>
+                    </div>`
+                ).join('');
+            } catch (e) {
+                el.innerHTML = '<div class="skill-empty">加载失败</div>';
+            }
+        }
+
+        async function uploadSkill(file) {
+            if (!file) return;
+            const hint = document.getElementById('uploadHint');
+            hint.style.color = '#aaa';
+            hint.textContent = '安装中...';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/api/skills/upload', { method: 'POST', body: form });
+                const data = await res.json();
+                if (data.error) {
+                    hint.style.color = '#f87171';
+                    hint.textContent = data.error;
+                } else {
+                    hint.style.color = '#4ade80';
+                    hint.textContent = `✓ 已安装「${data.skill.name}」`;
+                    loadSkills();
+                }
+            } catch (e) {
+                hint.style.color = '#f87171';
+                hint.textContent = '上传失败: ' + e.message;
+            }
+            setTimeout(() => hint.textContent = '', 4000);
+        }
+
+        async function deleteSkill(dir, name) {
+            if (!confirm(`确定删除技能「${name}」？`)) return;
+            try {
+                const res = await fetch('/api/skills/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ dir })
+                });
+                const data = await res.json();
+                if (data.ok) loadSkills();
+            } catch (e) {}
+        }
+
         loadConfig();
+        loadSkills();
     </script>
 </body>
 </html>
